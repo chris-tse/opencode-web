@@ -9,7 +9,7 @@ export const API_CONFIG = {
 // Default Provider/Model Settings
 export const DEFAULT_SETTINGS = {
   PROVIDER: 'anthropic',
-  MODEL: 'claude-3-5-sonnet-20241022'
+  MODEL: 'claude-sonnet-4-20250514'
 } as const
 
 // Event Stream Configuration

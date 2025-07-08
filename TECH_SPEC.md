@@ -29,15 +29,21 @@ src/
 │   │   ├── MessageList.tsx        # Message display
 │   │   ├── MessageBubble.tsx      # Individual message
 │   │   ├── MessageInput.tsx       # Input field + send
+│   │   ├── StreamingIndicator.tsx # Real-time status display
 │   │   └── TypingIndicator.tsx    # Loading state
 │   ├── ToolExecution/
-│   │   ├── ToolCall.tsx           # Tool invocation display
-│   │   └── ToolResult.tsx         # Tool result display
+│   │   ├── ToolResultDisplay.tsx  # Central tool result dispatcher
+│   │   ├── DiffViewer.tsx         # Unified diff display (MVP)
+│   │   ├── CollapsibleToolResult.tsx # Wrapper for tool results
+│   │   └── ToolExecutionStatus.tsx # Tool progress indicators
+│   ├── Debug/
+│   │   └── EventStreamDebug.tsx   # Development debugging panel
 │   └── ModelSelector.tsx          # Provider/model dropdown
 ├── hooks/
 │   ├── useSession.ts              # Session management
 │   ├── useMessages.ts             # Message state
 │   ├── useEventStream.ts          # SSE connection
+│   ├── useStreamingState.ts       # Streaming status management
 │   └── useProviders.ts            # Provider/model data
 ├── services/
 │   ├── api.ts                     # API client
@@ -45,6 +51,8 @@ src/
 │   └── types.ts                   # TypeScript definitions
 └── utils/
     ├── messageParser.ts           # Parse message parts
+    ├── streamingHelpers.ts        # Streaming detection utilities
+    ├── toolStatusHelpers.ts       # Tool status display helpers
     └── constants.ts               # API endpoints, etc.
 ```
 
@@ -186,6 +194,17 @@ interface MessageMetadata {
     };
   };
 }
+
+interface ToolMetadata {
+  preview?: string;     // File content preview (for read operations)
+  diff?: string;        // Unified diff format (for edit operations)
+  diagnostics?: Record<string, any>; // Error/warning information
+  title?: string;       // File name or operation title
+  time?: {
+    start: number;      // Tool execution start time
+    end: number;        // Tool execution end time
+  };
+}
 ```
 
 #### Event Stream (Server-Sent Events)
@@ -256,6 +275,13 @@ data: {
     args: Record<string, any>;
     result?: string;    // Only present when state === 'result'
   };
+}
+```
+
+#### Step Start Part
+```typescript
+{
+  type: 'step-start';
 }
 ```
 
@@ -349,7 +375,7 @@ interface Message {
 }
 
 interface MessagePart {
-  type: 'text' | 'tool-invocation' | 'reasoning' | 'file' | 'source-url'
+  type: 'text' | 'tool-invocation' | 'reasoning' | 'file' | 'source-url' | 'step-start'
   // ... type-specific properties
 }
 
@@ -415,18 +441,66 @@ interface MessageInputProps {
 // - Basic input validation
 ```
 
-### ToolCall Component
+### ToolResultDisplay Component
 ```typescript
-interface ToolCallProps {
+interface ToolResultDisplayProps {
   toolInvocation: ToolInvocation
-  expanded?: boolean
+  metadata: ToolMetadata
 }
 
 // Responsibilities:
-// - Display tool name and arguments
-// - Show execution state (call/partial/result)
-// - Collapsible tool details
-// - Format tool results
+// - Central dispatcher for all tool result rendering
+// - Route to appropriate display component based on tool type
+// - Provide fallback for unknown tools
+// - Handle tool execution states
+
+// MVP Implementation:
+const ToolResultDisplay = ({ toolInvocation, metadata }) => {
+  // Enhanced display for edit tool only
+  if (toolInvocation.toolName === 'edit' && metadata.diff) {
+    return <DiffViewer diff={metadata.diff} filename={metadata.title} />
+  }
+  
+  // All other tools: simple codeblock
+  return (
+    <pre className="tool-output">
+      <code>{toolInvocation.result}</code>
+    </pre>
+  )
+}
+```
+
+### DiffViewer Component (MVP Priority)
+```typescript
+interface DiffViewerProps {
+  diff: string              // Unified diff format
+  filename?: string         // File being modified
+  language?: string         // Syntax highlighting language
+}
+
+// Responsibilities:
+// - Parse unified diff format (@@ headers, +/- lines)
+// - Display side-by-side or unified diff view
+// - Syntax highlighting for code changes
+// - Line number display
+// - Collapsible by default per PRD requirements
+```
+
+### CollapsibleToolResult Component
+```typescript
+interface CollapsibleToolResultProps {
+  toolName: string
+  state: 'call' | 'partial-call' | 'result'
+  duration?: number
+  expanded?: boolean        // Default false per PRD
+  children: React.ReactNode
+}
+
+// Responsibilities:
+// - Consistent wrapper for all tool results
+// - Show/hide tool execution details
+// - Display tool execution timing
+// - Tool status indicators (running/completed/error)
 ```
 
 ## Real-time Communication
@@ -459,6 +533,51 @@ class EventStreamService {
 3. EventSource receives message.updated events
 4. UI updates with streaming message parts
 5. Final message.updated event marks completion
+
+### Message Part Flow Pattern
+Based on observed API responses, messages typically follow this pattern:
+```
+step-start → action (text/tool-invocation) → step-start → action → ...
+```
+
+**Simple Text Response:**
+```
+step-start → text
+```
+
+**Multi-step Tool Response:**
+```
+step-start → tool-invocation (read) → step-start → tool-invocation (edit) → step-start → text
+```
+
+### Tool Execution Display
+Tool invocations include rich metadata for UI display:
+
+**Unified Diff Format** (from edit operations):
+```diff
+Index: /path/to/file.md
+===================================================================
+--- /path/to/file.md
++++ /path/to/file.md
+@@ -76,4 +76,6 @@
+ 
+ **Join our community** [YouTube](https://example.com) | [X.com](https://x.com)
++
++edited by opencode
+```
+
+**File Content with Line Numbers** (from read operations):
+```
+00001| <p align="center">
+00002|   <a href="https://opencode.ai">
+00076| **Join our community** [YouTube](https://example.com)
+```
+
+**Parsing Opportunities:**
+- Extract line numbers from `@@` headers in diffs
+- Parse `+`/`-` prefixes for added/removed lines
+- Use line numbers from read operations for navigation
+- Display side-by-side diffs with syntax highlighting
 
 ## Error Handling
 
@@ -552,6 +671,113 @@ interface Config {
 - **Gzip compression** - Reduce bundle size
 - **Cache headers** - Optimize loading
 
+## Tool Result Display Architecture
+
+### MVP Tool Rendering Strategy
+
+**Enhanced Components (High Value)**
+```typescript
+// edit tool - Unified diff display
+interface DiffViewerProps {
+  diff: string              // Unified diff format from metadata.diff
+  filename?: string         // From metadata.title
+  language?: string         // Auto-detect from filename extension
+}
+```
+
+**Simple Codeblock Fallback (MVP)**
+```typescript
+// All other tools: read, bash, list, glob, grep, webfetch, todo
+<pre className="tool-output">
+  <code>{toolInvocation.result}</code>
+</pre>
+```
+
+### Post-MVP Enhanced Components
+
+**File Operations**
+```typescript
+// read tool - Syntax highlighted file preview
+interface FilePreviewProps {
+  content: string           // From metadata.preview
+  filename: string          // From metadata.title
+  language?: string         // Auto-detect from extension
+  highlightLines?: number[] // Context-specific highlighting
+  maxLines?: number         // Truncation for large files
+}
+```
+
+**Command Execution**
+```typescript
+// bash tool - Rich command output
+interface CommandOutputProps {
+  command: string           // From toolInvocation.args.command
+  output: string            // From toolInvocation.result
+  exitCode?: number         // From metadata.exitCode
+  duration: number          // From metadata.time
+}
+```
+
+**File System Operations**
+```typescript
+// list/glob tools - Interactive directory tree
+interface DirectoryTreeProps {
+  path: string              // From toolInvocation.args.path
+  items: DirectoryItem[]    // Parsed from toolInvocation.result
+  expandable: boolean       // Interactive expansion
+}
+
+// grep tool - Clickable search results
+interface SearchResultsProps {
+  pattern: string           // From toolInvocation.args.pattern
+  matches: SearchMatch[]    // Parsed from toolInvocation.result
+  totalFiles: number        // From metadata
+}
+```
+
+**Web and Task Operations**
+```typescript
+// webfetch tool - Formatted web content
+interface WebContentPreviewProps {
+  url: string               // From toolInvocation.args.url
+  content: string           // From toolInvocation.result
+  format: 'markdown' | 'html' | 'text' // From toolInvocation.args.format
+}
+
+// todo tools - Interactive task management
+interface TodoListProps {
+  todos: TodoItem[]         // Parsed from toolInvocation.result
+  changes?: TodoChange[]    // From metadata.changes
+}
+```
+
+### Streaming Status Enhancement
+
+**Real-time Tool Progress**
+```typescript
+// Status message progression
+"Waiting for response..."                    // Initial wait only
+"Reading file..."                           // Specific tool execution
+"✓ Reading file completed"                  // Brief completion feedback
+"Editing file..."                           // Next tool
+"✓ Completed 3 tools - Generating response..." // Overall progress
+```
+
+**Status Helper Functions**
+```typescript
+// Tool display name mapping
+getToolDisplayName(toolName: string): string
+// "read" → "Reading file", "bash" → "Running command"
+
+// Status message generation
+getToolStatusMessage(toolName: string, state: string): string
+// Combines tool name with execution state
+
+// Overall progress tracking
+getOverallToolStatus(toolParts: MessagePart[]): string
+// Analyzes all tools in message for comprehensive status
+```
+
 ## Future Considerations
 
 ### Scalability Preparation
@@ -559,12 +785,14 @@ interface Config {
 - **Component library** - Reusable UI components
 - **API abstraction** - Swappable backend services
 - **Plugin architecture** - Extensible tool system
+- **Tool result caching** - Avoid re-parsing large outputs
 
 ### Performance Monitoring
 - **Bundle analysis** - Track size growth
 - **Runtime metrics** - Message rendering performance
 - **Error tracking** - Production error monitoring
 - **User analytics** - Usage patterns and bottlenecks
+- **Tool execution metrics** - Track tool usage and performance
 
 ## Implementation Phases
 

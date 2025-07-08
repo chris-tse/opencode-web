@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef, type FormEvent } from 'react'
+import { useState, useEffect, type FormEvent } from 'react'
 import { createSession, sendMessage } from './services/api'
 import { createTextMessageRequest } from './utils/apiHelpers'
 import { createEventStream } from './services/eventStream'
-import type { StreamEvent } from './services/types'
+import { EventStreamDebug } from './components/Debug/EventStreamDebug'
+import { getOverallToolStatus, hasActiveToolExecution, getToolProgress } from './utils/toolStatusHelpers'
 import './App.css'
 
 function App() {
@@ -10,16 +11,91 @@ function App() {
   const [responses, setResponses] = useState<string[]>([])
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [currentResponse, setCurrentResponse] = useState('')
-  const [isStreaming, setIsStreaming] = useState(false)
-  const eventStreamRef = useRef<ReturnType<typeof createEventStream> | null>(null)
+  const [currentStatus, setCurrentStatus] = useState<string>('')
+  const [eventStream] = useState(() => createEventStream())
+  const [hasReceivedFirstEvent, setHasReceivedFirstEvent] = useState(false)
 
-  // Auto-create session on app initialization
+  // Update status based on message content
+  const updateStatusFromMessage = (message: any) => {
+    if (!hasReceivedFirstEvent) {
+      setHasReceivedFirstEvent(true)
+    }
+    
+    // Check if message is complete
+    if (message.metadata?.time?.completed) {
+      setCurrentStatus('')
+      setIsLoading(false)
+      return
+    }
+
+    // Get tool status using helper functions
+    if (hasActiveToolExecution(message)) {
+      const status = getOverallToolStatus(message.parts || [])
+      setCurrentStatus(status)
+    } else {
+      const progress = getToolProgress(message)
+      if (progress.total > 0) {
+        setCurrentStatus(`✓ Completed ${progress.total} tool${progress.total > 1 ? 's' : ''} - Generating response...`)
+      } else {
+        setCurrentStatus('Generating response...')
+      }
+    }
+  }
+
+  // Update status based on individual message parts
+  const updateStatusFromPart = (part: any) => {
+    if (!hasReceivedFirstEvent) {
+      setHasReceivedFirstEvent(true)
+    }
+
+    if (part.type === 'tool-invocation' && part.toolInvocation) {
+      const status = getOverallToolStatus([part])
+      setCurrentStatus(status)
+      
+      // If tool completed, briefly show completion then switch to generating
+      if (part.toolInvocation.state === 'result') {
+        setTimeout(() => {
+          if (isLoading) {
+            setCurrentStatus('Generating response...')
+          }
+        }, 800)
+      }
+    } else if (part.type === 'text') {
+      setCurrentStatus('Generating response...')
+    } else if (part.type === 'step-start') {
+      if (hasReceivedFirstEvent) {
+        setCurrentStatus('Processing next step...')
+      }
+    }
+  }
+
+
+  // Auto-create session and connect to event stream on app initialization
   useEffect(() => {
     const initSession = async () => {
       try {
         const session = await createSession()
         setSessionId(session.id)
+        
+        // Connect to event stream
+        eventStream.connect()
+        
+        // Subscribe to events
+        eventStream.subscribe('message.updated', (data: any) => {
+          // console.log('Message updated:', data)
+          updateStatusFromMessage(data.info)
+        })
+        
+        eventStream.subscribe('message.part.updated', (data: any) => {
+          // console.log('Message part updated:', data)
+          updateStatusFromPart(data.part)
+        })
+        
+        eventStream.subscribe('session.error', (data: any) => {
+          console.error('Session error:', data)
+          setResponses(prev => [...prev, `Error: ${data.error.data.message}`])
+        })
+        
       } catch (error) {
         console.error('Failed to create session:', error)
         const errorMessage = error instanceof Error ? error.message : 'Unknown error'
@@ -27,16 +103,12 @@ function App() {
       }
     }
     initSession()
-  }, [])
-
-  // Cleanup EventSource on unmount
-  useEffect(() => {
+    
+    // Cleanup on unmount
     return () => {
-      if (eventStreamRef.current) {
-        eventStreamRef.current.disconnect()
-      }
+      eventStream.disconnect()
     }
-  }, [])
+  }, [eventStream])
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -45,75 +117,46 @@ function App() {
     const userInput = input.trim()
     setInput('')
     setIsLoading(true)
+    setHasReceivedFirstEvent(false)
+    setCurrentStatus('Sending message...')
     
     // Add user message to responses
     setResponses(prev => [...prev, `You: ${userInput}`])
     
     try {
       const message = createTextMessageRequest(userInput)
+      
+      // Initial status - will be updated by event stream
+      setCurrentStatus('Waiting for response...')
+      
       const response = await sendMessage(sessionId, message)
+      // console.log('Message response:', response)
       
-      console.log('Message response:', response)
+      // If we haven't received any events yet, handle the response directly
+      if (!hasReceivedFirstEvent) {
+        const hasTools = response.parts.some(part => part.type === 'tool-invocation')
+        if (hasTools) {
+          setCurrentStatus('Processing tools...')
+        } else {
+          setCurrentStatus('Response received')
+        }
+      }
       
-      // Start streaming the response
-      setIsStreaming(true)
-      setCurrentResponse('')
+      // Extract text content from response parts
+      const textParts = response.parts
+        .filter(part => part.type === 'text')
+        .map(part => part.text)
+        .join('')
       
-      // Create EventStream connection for streaming with session ID
-      const eventStream = createEventStream()
-      eventStreamRef.current = eventStream
-      
-      // Subscribe to all event types for debugging
-      eventStream.subscribe('message.updated', (data: StreamEvent) => {
-        console.log('message.updated event:', data)
-        handleStreamEvent(data)
-      })
-      
-      eventStream.subscribe('session.idle', (data: StreamEvent) => {
-        console.log('session.idle event:', data)
-        handleStreamEvent(data)
-      })
-      
-      eventStream.subscribe('session.error', (data: StreamEvent) => {
-        console.log('session.error event:', data)
-        handleStreamEvent(data)
-      })
-      
-      // Connect to the stream
-      eventStream.connect()
+      // Add the assistant's response
+      setResponses(prev => [...prev, `Assistant: ${textParts}`])
       
     } catch (error) {
       console.error('Failed to send message:', error)
       setResponses(prev => [...prev, `Error: Failed to send message - ${error}`])
     } finally {
       setIsLoading(false)
-    }
-  }
-
-  const handleStreamEvent = (event: StreamEvent) => {
-    console.log('Stream chunk received:', event)
-    
-    if (event.type === 'message.updated') {
-      // Update the current streaming response
-      const content = extractTextContent(event)
-      setCurrentResponse(content)
-    } else if (event.type === 'session.idle') {
-      // Stream finished
-      setIsStreaming(false)
-      if (currentResponse) {
-        setResponses(prev => [...prev, `Assistant: ${currentResponse}`])
-        setCurrentResponse('')
-      }
-    }
-  }
-
-  const extractTextContent = (event: StreamEvent): string => {
-    // Extract text content from the stream event
-    // This is a simplified version - you may need to adjust based on the actual event structure
-    try {
-      return JSON.stringify(event.properties, null, 2)
-    } catch {
-      return 'Streaming response...'
+      setCurrentStatus('')
     }
   }
 
@@ -125,6 +168,9 @@ function App() {
       padding: '20px',
       boxSizing: 'border-box'
     }}>
+      {/* Debug component - only shows in development */}
+      {/* <EventStreamDebug eventStream={eventStream} /> */}
+      
       {/* Response area */}
       <div style={{ 
         flex: 1, 
@@ -139,15 +185,28 @@ function App() {
             {response}
           </div>
         ))}
-        {isStreaming && (
+        {isLoading && currentStatus && (
           <div style={{ 
             marginBottom: '10px', 
             fontStyle: 'italic',
             color: '#666',
             borderLeft: '3px solid #007bff',
-            paddingLeft: '10px'
+            paddingLeft: '10px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
           }}>
-            Assistant: {currentResponse || 'Thinking...'}
+            <span>{currentStatus}</span>
+            {currentStatus.includes('...') && (
+              <div style={{
+                width: '16px',
+                height: '16px',
+                border: '2px solid #f3f3f3',
+                borderTop: '2px solid #007bff',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite'
+              }} />
+            )}
           </div>
         )}
       </div>

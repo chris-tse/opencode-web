@@ -74,7 +74,11 @@ Users need a web-based alternative to the command-line opencode TUI that provide
 
 #### Chat Interface
 - **Message bubbles** with user/assistant distinction
-- **Basic tool execution display** (collapsed by default)
+- **Tool execution display** (collapsed by default) with specific rendering:
+  - **Edit tool**: Enhanced diff viewer component
+  - **Read tool**: File preview with syntax highlighting (post-MVP)
+  - **Other tools**: Raw codeblock output (bash, list, glob, grep, webfetch, todo)
+- **Real-time status updates** showing specific tool execution progress
 - **Typing indicators** during AI response
 - **Auto-scroll** to latest message
 - **Message input** with send button
@@ -142,7 +146,14 @@ Users need a web-based alternative to the command-line opencode TUI that provide
 - **Session management** (create, list, switch, delete)
 - **Session sharing** and collaboration
 - **File operations** and search
-- **Advanced tool displays** with file previews
+- **Enhanced tool result displays**:
+  - Interactive directory tree (list/glob results)
+  - Clickable search results (grep results)
+  - Rich command output (bash results)
+  - Web content preview (webfetch results)
+  - Interactive todo management (todo results)
+  - Image viewer (for image file operations)
+  - Tool execution timeline for multi-step operations
 - **Reasoning display** for supported models
 - **Session persistence** and history
 
@@ -193,6 +204,55 @@ Users need a web-based alternative to the command-line opencode TUI that provide
 - **Performance on large sessions**: Implement pagination and lazy loading
 - **Browser compatibility**: Test early and often across browsers
 
+## Tool Result Display Strategy
+
+### MVP Implementation
+The MVP will use a centralized `ToolResultDisplay` component that handles all tool result rendering:
+
+```typescript
+const ToolResultDisplay = ({ toolInvocation, metadata }) => {
+  // Enhanced display for edit tool only
+  if (toolInvocation.toolName === 'edit' && metadata.diff) {
+    return <DiffViewer diff={metadata.diff} filename={metadata.title} />
+  }
+  
+  // All other tools: simple codeblock
+  return (
+    <pre className="tool-output">
+      <code>{toolInvocation.result}</code>
+    </pre>
+  )
+}
+```
+
+### Tool Categories by Implementation Priority
+
+**MVP: Enhanced Display (High Value)**
+- `edit` tool → DiffViewer component (unified diff format)
+
+**MVP: Raw Codeblock (Simple)**
+- `read` tool → Plain text with line numbers
+- `bash` tool → Command output
+- `list`/`glob` tools → Directory listings
+- `grep` tool → Search results
+- `webfetch` tool → Web content
+- `todo` tools → Task lists
+
+**Post-MVP: Rich Components**
+- Interactive directory trees
+- Clickable search results with file navigation
+- Syntax-highlighted file previews
+- Command output with execution metadata
+- Web content with proper formatting
+- Interactive todo management
+
+### Status Message Enhancement
+Real-time status updates show specific tool execution progress:
+- "Waiting for response..." (initial wait only)
+- "Reading file..." / "Editing file..." / "Running command..." (specific tools)
+- "✓ Reading file completed" (completion feedback)
+- "✓ Completed 3 tools - Generating response..." (overall progress)
+
 ## Conclusion
 
-The opencode-ui MVP will provide a solid foundation for web-based AI-assisted coding, replicating the core TUI functionality while laying groundwork for future enhancements. Success will be measured by functional parity, performance, and user adoption.
+The opencode-ui MVP will provide a solid foundation for web-based AI-assisted coding, replicating the core TUI functionality while laying groundwork for future enhancements. The tool result display strategy balances immediate value (diff viewing) with implementation simplicity (codeblocks for other tools). Success will be measured by functional parity, performance, and user adoption.

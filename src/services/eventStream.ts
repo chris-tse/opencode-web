@@ -14,6 +14,11 @@ export class EventStreamService {
 
   constructor(baseUrl: string = '') {
     this.baseUrl = baseUrl || (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:4096')
+    
+    // Expose debug object globally in development
+    if (import.meta.env.DEV) {
+      (window as any).__eventStreamDebug = this
+    }
   }
 
   // Connect to the event stream
@@ -26,13 +31,16 @@ export class EventStreamService {
     this.eventSource = new EventSource(url)
 
     this.eventSource.onopen = () => {
-      console.log('EventSource connected')
+      // console.log('✅ EventSource connected to:', url)
+      // console.log('📡 Connection state:', this.eventSource?.readyState)
+      // console.log('🎯 Active listeners:', Array.from(this.listeners.keys()))
       this.reconnectAttempts = 0
     }
 
     this.eventSource.onmessage = (event) => {
       try {
         const data: StreamEvent = JSON.parse(event.data)
+        // console.log('📨 Received event:', data.type, data.properties)
         this.handleEvent(data)
       } catch (error) {
         console.error('Failed to parse event data:', error)
@@ -62,6 +70,7 @@ export class EventStreamService {
     }
     
     this.listeners.get(eventType)!.push(callback as EventListener)
+    // console.log(`🔔 Subscribed to '${eventType}' (${this.listeners.get(eventType)!.length} listeners)`)
 
     // Return unsubscribe function
     return () => {
@@ -70,6 +79,7 @@ export class EventStreamService {
         const index = callbacks.indexOf(callback as EventListener)
         if (index > -1) {
           callbacks.splice(index, 1)
+          // console.log(`🔕 Unsubscribed from '${eventType}' (${callbacks.length} listeners remaining)`)
         }
       }
     }
@@ -113,6 +123,22 @@ export class EventStreamService {
 
   get connectionState(): number {
     return this.eventSource?.readyState ?? EventSource.CLOSED
+  }
+
+  // Debug methods
+  getDebugInfo() {
+    return {
+      isConnected: this.isConnected,
+      connectionState: this.connectionState,
+      url: this.eventSource?.url,
+      listeners: Object.fromEntries(
+        Array.from(this.listeners.entries()).map(([key, callbacks]) => [
+          key, 
+          callbacks.length
+        ])
+      ),
+      reconnectAttempts: this.reconnectAttempts
+    }
   }
 }
 

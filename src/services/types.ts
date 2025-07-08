@@ -43,7 +43,7 @@ export interface ProvidersResponse {
 
 // Message Types
 export interface MessagePart {
-  type: 'text' | 'tool-invocation' | 'reasoning' | 'file' | 'source-url'
+  type: 'text' | 'tool-invocation' | 'reasoning' | 'file' | 'source-url' | 'step-start'
   text?: string
   mediaType?: string
   filename?: string
@@ -90,8 +90,14 @@ export interface MessageMetadata {
 }
 
 export interface ToolMetadata {
-  // Tool-specific metadata structure
-  [key: string]: unknown
+  preview?: string     // File content preview (for read operations)
+  diff?: string        // Unified diff format (for edit operations)
+  diagnostics?: Record<string, unknown> // Error/warning information
+  title?: string       // File name or operation title
+  time?: {
+    start: number      // Tool execution start time
+    end: number        // Tool execution end time
+  }
 }
 
 export interface Message {
