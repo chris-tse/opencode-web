@@ -1,69 +1,109 @@
-# React + TypeScript + Vite
+# opencode-web
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A web-based user interface for [opencode](https://github.com/sst/opencode), providing a modern chat interface to interact with AI coding agents.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Real-time chat interface** with AI coding agents
+- **Live streaming responses** via Server-Sent Events
+- **Tool execution display** with enhanced diff viewing for code changes
+- **Model selection** from multiple AI providers
+- **Responsive design** for desktop and mobile
+- **Auto-session creation** for immediate use
 
-## Expanding the ESLint configuration
+## Getting Started
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### Prerequisites
 
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+- [Bun](https://bun.sh/) (recommended) or Node.js 18+
+- Running [opencode](https://github.com/sst/opencode) API server
 
-      // Remove tseslint.configs.recommended and replace with this
-      ...tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      ...tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      ...tseslint.configs.stylisticTypeChecked,
+### Installation
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+# Clone the repository
+git clone https://github.com/your-username/opencode-ui.git
+cd opencode-ui
+
+# Install dependencies
+bun install
+
+# Start opencode server
+cd /path/to/your-project
+opencode serve
+
+# Start development server
+bun dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+The application will be available at `http://localhost:5173`
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### Configuration
 
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+The app will auto-detect your opencode API server. If running on a different host/port, configure the API endpoint in your environment.
+
+## Development
+
+### Available Scripts
+
+- `bun dev` - Start development server with hot reload
+- `bun run build` - Build for production
+- `bun run lint` - Run ESLint
+- `bun run preview` - Preview production build
+
+### Tech Stack
+
+- **React 19** with TypeScript
+- **Vite** for build tooling
+- **EventSource** for real-time streaming
+- **CSS Modules** for styling
+
+### Project Structure
+
 ```
+src/
+├── components/
+│   ├── Chat/           # Chat interface components
+│   └── Debug/          # Development debugging tools
+├── hooks/              # Custom React hooks
+├── services/           # API integration
+└── utils/              # Helper functions
+```
+
+## Usage
+
+1. **Start a conversation** - Type your coding request in the chat input
+2. **Watch AI work** - See real-time tool execution and code changes
+3. **Review results** - Enhanced diff viewer shows exactly what changed
+4. **Continue iterating** - Build on previous responses naturally
+
+## License
+
+This project is dual-licensed:
+
+### Open Source License
+AGPL-3.0 for personal, educational, and open source projects.
+
+### Commercial License
+Required for commercial use, proprietary software, or if you cannot comply with AGPL-3.0 terms.
+
+Contact [your-email] for commercial licensing.
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Run tests and linting
+5. Submit a pull request
+
+## Related Projects
+
+- [opencode](https://github.com/sst/opencode) - The AI coding agent backend
+- [opencode TUI](https://github.com/sst/opencode) - Terminal interface
+
+## Support
+
+- [Documentation](./PRD.md) - Product requirements and features
+- [Technical Specification](./TECH_SPEC.md) - Architecture details
+- [Issues](https://github.com/your-username/opencode-ui/issues) - Bug reports and feature requests
