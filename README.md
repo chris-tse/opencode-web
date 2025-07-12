@@ -107,3 +107,8 @@ Contact [your-email] for commercial licensing.
 - [Documentation](./PRD.md) - Product requirements and features
 - [Technical Specification](./TECH_SPEC.md) - Architecture details
 - [Issues](https://github.com/your-username/opencode-ui/issues) - Bug reports and feature requests
+
+## Additional Links
+
+- [opencode](https://github.com/sst/opencode) - The main opencode CLI and API server
+- [opencode.ai](https://opencode.ai) - Official website and documentation

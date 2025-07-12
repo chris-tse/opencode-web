@@ -2,9 +2,12 @@ import { useState, useEffect, type FormEvent } from 'react'
 import { createSession, sendMessage } from './services/api'
 import { createTextMessageRequest } from './utils/apiHelpers'
 import { createEventStream } from './services/eventStream'
-import { EventStreamDebug } from './components/Debug/EventStreamDebug'
+// import { EventStreamDebug } from './components/Debug/EventStreamDebug'
 import { getOverallToolStatus, hasActiveToolExecution, getToolProgress } from './utils/toolStatusHelpers'
-import './App.css'
+import { Button } from './components/ui/button'
+import { Textarea } from './components/ui/textarea'
+import { ScrollArea } from './components/ui/scroll-area'
+import { Avatar, AvatarFallback } from './components/ui/avatar'
 
 function App() {
   const [input, setInput] = useState('')
@@ -161,85 +164,88 @@ function App() {
   }
 
   return (
-    <div style={{ 
-      height: '100vh', 
-      display: 'flex', 
-      flexDirection: 'column',
-      padding: '20px',
-      boxSizing: 'border-box'
-    }}>
-      {/* Debug component - only shows in development */}
-      {/* <EventStreamDebug eventStream={eventStream} /> */}
-      
-      {/* Response area */}
-      <div style={{ 
-        flex: 1, 
-        overflowY: 'auto',
-        marginBottom: '20px',
-        border: '1px solid #ccc',
-        padding: '10px',
-        borderRadius: '4px'
-      }}>
-        {responses.map((response, index) => (
-          <div key={index} style={{ marginBottom: '10px' }}>
-            {response}
-          </div>
-        ))}
-        {isLoading && currentStatus && (
-          <div style={{ 
-            marginBottom: '10px', 
-            fontStyle: 'italic',
-            color: '#666',
-            borderLeft: '3px solid #007bff',
-            paddingLeft: '10px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}>
-            <span>{currentStatus}</span>
-            {currentStatus.includes('...') && (
-              <div style={{
-                width: '16px',
-                height: '16px',
-                border: '2px solid #f3f3f3',
-                borderTop: '2px solid #007bff',
-                borderRadius: '50%',
-                animation: 'spin 1s linear infinite'
-              }} />
-            )}
-          </div>
-        )}
+    <div className="flex flex-col h-screen max-w-4xl mx-auto p-4">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold">OpenCode UI</h1>
       </div>
+      
+      <ScrollArea className="flex-1 mb-4 border rounded-lg p-4">
+        <div className="space-y-4">
+          {responses.map((response, index) => {
+            const isUser = response.startsWith('You: ')
+            const isAssistant = response.startsWith('Assistant: ')
+            const isError = response.startsWith('Error: ')
+            const content = isUser ? response.slice(5) : isAssistant ? response.slice(11) : response
+            
+            return (
+              <div key={index} className="flex items-start gap-3">
+                <Avatar className="w-8 h-8">
+                  <AvatarFallback>
+                    {isUser ? 'U' : isAssistant ? 'A' : '!'}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1">
+                  <div className={`rounded-lg p-3 ${
+                    isUser ? 'bg-blue-50' : 
+                    isError ? 'bg-red-50 text-red-700' : 
+                    'bg-gray-50'
+                  }`}>
+                    <div className="whitespace-pre-wrap">{content}</div>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+          
+          {isLoading && currentStatus && (
+            <div className="flex items-start gap-3">
+              <Avatar className="w-8 h-8">
+                <AvatarFallback>A</AvatarFallback>
+              </Avatar>
+              <div className="flex-1">
+                <div className="bg-gray-50 rounded-lg p-3">
+                  <div className="text-gray-600 italic">{currentStatus}</div>
+                  {currentStatus.includes('...') && (
+                    <div className="mt-2">
+                      <div className="animate-pulse flex space-x-1">
+                        <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                        <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                        <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </ScrollArea>
 
-      {/* Input area */}
-      <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '10px' }}>
-        <input
-          type="text"
+      <form onSubmit={handleSubmit} className="flex gap-2">
+        <Textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Type your message..."
-          style={{
-            flex: 1,
-            padding: '10px',
-            border: '1px solid #ccc',
-            borderRadius: '4px',
-            fontSize: '16px'
+          disabled={isLoading || !sessionId}
+          className="flex-1 min-h-[60px] resize-none"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault()
+              handleSubmit(e)
+            }
           }}
         />
-        <button 
-          type="submit"
-          style={{
-            padding: '10px 20px',
-            backgroundColor: '#007bff',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
+        <Button 
+          type="submit" 
+          disabled={isLoading || !sessionId || !input.trim()}
+          className="self-end"
         >
-          Send
-        </button>
+          {isLoading ? 'Sending...' : 'Send'}
+        </Button>
       </form>
+
+      {/* Debug component - only shows in development */}
+      {/* <EventStreamDebug eventStream={eventStream} /> */}
     </div>
   )
 }
