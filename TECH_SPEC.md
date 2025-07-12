@@ -79,6 +79,28 @@ src/
 
 ### Core Endpoints
 
+#### Get Session Messages
+```typescript
+GET /session/{id}/message
+
+// Path Parameters
+id: string;             // Session ID
+
+// Response: 200 OK
+Message[]               // Array of messages in the session
+```
+
+#### Initialize Session
+```typescript
+POST /session/{id}/init
+
+// Path Parameters
+id: string;             // Session ID
+
+// Response: 200 OK
+// Session initialization response
+```
+
 #### Create Session
 ```typescript
 POST /session
@@ -98,9 +120,27 @@ Content-Type: application/json
 }
 ```
 
-#### Get Providers and Models
+#### Get App Info
 ```typescript
-GET /config/providers
+GET /app
+
+// Response: 200 OK
+{
+  // App information schema
+}
+```
+
+#### Initialize App
+```typescript
+POST /app/init
+
+// Response: 200 OK
+boolean  // Initialization success status
+```
+
+#### Get Config (Providers and Models)
+```typescript
+GET /config
 
 // Response: 200 OK
 {
@@ -148,22 +188,29 @@ id: string;             // Session ID
 {
   providerID: string;   // Provider ID (e.g., "anthropic")
   modelID: string;      // Model ID (e.g., "claude-3-5-sonnet-20241022")
+  mode: string;         // Interaction mode (e.g., "build", "plan", or custom mode)
   parts: MessagePart[]; // Message content
 }
 
-interface MessagePart {
-  type: 'text' | 'file' | 'source-url';
+interface UserMessagePart {
+  type: 'text' | 'file';
   text?: string;        // For text parts
   mediaType?: string;   // For file parts
   filename?: string;    // For file parts
-  url?: string;         // For file/source-url parts
+  url?: string;         // For file parts
+}
+
+interface AssistantMessagePart {
+  type: 'text' | 'tool' | 'step-start' | 'step-finish';
+  // Type-specific properties based on part type
 }
 
 // Response: 200 OK
+// Returns AssistantMessage schema
 {
   id: string;           // Message ID
-  role: 'user' | 'assistant';
-  parts: MessagePart[];
+  role: 'assistant';
+  parts: AssistantMessagePart[];
   metadata: MessageMetadata;
 }
 
@@ -233,6 +280,28 @@ data: {
 }
 
 data: {
+  type: 'message.removed';
+  properties: {
+    sessionID: string;
+    messageID: string;
+  };
+}
+
+data: {
+  type: 'session.updated';
+  properties: {
+    session: Session;   // Updated session object
+  };
+}
+
+data: {
+  type: 'session.deleted';
+  properties: {
+    sessionID: string;
+  };
+}
+
+data: {
   type: 'session.error';
   properties: {
     error: {
@@ -251,6 +320,54 @@ data: {
     sessionID: string;
   };
 }
+
+data: {
+  type: 'file.edited';
+  properties: {
+    path: string;
+    content?: string;
+  };
+}
+
+data: {
+  type: 'file.watcher.updated';
+  properties: {
+    path: string;
+    event: string;
+  };
+}
+
+data: {
+  type: 'storage.write';
+  properties: {
+    key: string;
+    value: any;
+  };
+}
+
+data: {
+  type: 'permission.updated';
+  properties: {
+    permission: string;
+    granted: boolean;
+  };
+}
+
+data: {
+  type: 'installation.updated';
+  properties: {
+    package: string;
+    status: string;
+  };
+}
+
+data: {
+  type: 'lsp.client.diagnostics';
+  properties: {
+    uri: string;
+    diagnostics: any[];
+  };
+}
 ```
 
 ### Message Part Types
@@ -263,17 +380,24 @@ data: {
 }
 ```
 
-#### Tool Invocation Part
+#### Tool Part (Updated)
 ```typescript
 {
-  type: 'tool-invocation';
-  toolInvocation: {
-    state: 'call' | 'partial-call' | 'result';
-    step?: number;
-    toolCallId: string;
-    toolName: string;
-    args: Record<string, any>;
-    result?: string;    // Only present when state === 'result'
+  type: 'tool';
+  id: string;           // Tool execution ID
+  tool: string;         // Tool name (e.g., "read", "edit", "bash")
+  state: ToolState;     // Tool execution state
+}
+
+interface ToolState {
+  status: 'pending' | 'running' | 'completed' | 'error';
+  input: Record<string, any>;     // Tool input arguments
+  output?: string;                // Tool output (when completed)
+  title?: string;                 // Display title
+  metadata?: Record<string, any>; // Additional metadata
+  time?: {
+    start: number;                // Start timestamp
+    end: number;                  // End timestamp
   };
 }
 ```
@@ -285,12 +409,10 @@ data: {
 }
 ```
 
-#### Reasoning Part
+#### Step Finish Part
 ```typescript
 {
-  type: 'reasoning';
-  text: string;
-  providerMetadata?: Record<string, any>;
+  type: 'step-finish';
 }
 ```
 
@@ -309,12 +431,15 @@ data: {
 #### Session Lifecycle
 ```typescript
 // 1. App initialization
+await api.initializeApp()
 const session = await api.createSession()
+await api.initializeSession(session.id)
 
 // 2. Send message
 const message = await api.sendMessage(session.id, {
   providerID: 'anthropic',
   modelID: 'claude-3-5-sonnet-20241022',
+  mode: 'build',  // Available modes: "build", "plan", or custom modes
   parts: [{ type: 'text', text: userInput }]
 })
 

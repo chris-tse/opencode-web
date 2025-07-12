@@ -9,7 +9,19 @@ export const API_CONFIG = {
 // Default Provider/Model Settings
 export const DEFAULT_SETTINGS = {
   PROVIDER: 'anthropic',
-  MODEL: 'claude-sonnet-4-20250514'
+  MODEL: 'claude-sonnet-4-20250514',
+  MODE: 'build'
+} as const
+
+// Available Modes
+export const MODES = {
+  BUILD: 'build',
+  PLAN: 'plan'
+} as const
+
+export const MODE_LABELS = {
+  [MODES.BUILD]: 'Build',
+  [MODES.PLAN]: 'Plan'
 } as const
 
 // Event Stream Configuration

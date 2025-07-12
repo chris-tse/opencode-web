@@ -7,10 +7,9 @@
 - **IMPORTANT**: Always reference these documents before making architectural decisions
 
 ## Build/Test Commands
-- `npm run dev` - Start development server
-- `npm run build` - Build for production (runs TypeScript check + Vite build)
-- `npm run lint` - Run ESLint
-- `npm run preview` - Preview production build
+- `bun dev` - Start development server, do not run
+- `bun build` - Build for production (runs TypeScript check + Vite build)
+- `bun lint` - Run ESLint
 - No test framework configured yet
 
 ## MVP Scope (from PRD.md)
@@ -38,6 +37,7 @@
 - **Exports**: Default exports for components, named for utilities
 - **JSX**: Use react-jsx transform (no React import needed)
 - **Assets**: Import assets directly (e.g., `import logo from './logo.svg'`)
+- Never use `any` type, always properly type function signatures and values
 
 ## ESLint Config
 - Uses typescript-eslint, react-hooks, and react-refresh plugins

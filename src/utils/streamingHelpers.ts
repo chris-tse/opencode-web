@@ -1,4 +1,4 @@
-import type { Message, MessagePart } from '../services/types'
+import type { Message, AssistantMessagePart } from '../services/types'
 
 // Streaming state detection utilities
 export interface StreamingState {
@@ -10,20 +10,26 @@ export interface StreamingState {
 }
 
 // Check if a message is currently streaming
-export const isMessageStreaming = (message: Message): boolean => {
+export const isMessageStreaming = (message: Message, sessionIdle = false): boolean => {
   // Message is streaming if:
   // 1. No completion timestamp
   // 2. Has incomplete tool invocations
   // 3. Ends with step-start (indicating more content coming)
+  // 4. Session is not idle
   
   if (message.metadata.time.completed) {
     return false
   }
 
+  // If session is idle, message is not streaming
+  if (sessionIdle) {
+    return false
+  }
+
   // Check for incomplete tool invocations
   const hasIncompleteTools = message.parts.some(part => 
-    part.type === 'tool-invocation' && 
-    part.toolInvocation?.state !== 'result'
+    part.type === 'tool' && 
+    part.state?.status !== 'completed'
   )
 
   // Check if last part is step-start (more content expected)
@@ -34,13 +40,13 @@ export const isMessageStreaming = (message: Message): boolean => {
 }
 
 // Get streaming state for a message
-export const getStreamingState = (message: Message): StreamingState => {
-  const isStreaming = isMessageStreaming(message)
-  const isComplete = !!message.metadata.time.completed
+export const getStreamingState = (message: Message, sessionIdle = false): StreamingState => {
+  const isStreaming = isMessageStreaming(message, sessionIdle)
+  const isComplete = !!message.metadata.time.completed || sessionIdle
   
   // Count steps and tool executions
   const stepStarts = message.parts.filter(part => part.type === 'step-start').length
-  const toolInvocations = message.parts.filter(part => part.type === 'tool-invocation').length
+  const toolInvocations = message.parts.filter(part => part.type === 'tool').length
 
   return {
     isStreaming,
@@ -52,13 +58,13 @@ export const getStreamingState = (message: Message): StreamingState => {
 }
 
 // Check if a specific tool is still executing
-export const isToolExecuting = (message: Message, toolCallId: string): boolean => {
+export const isToolExecuting = (message: Message, toolId: string): boolean => {
   const toolPart = message.parts.find(part => 
-    part.type === 'tool-invocation' && 
-    part.toolInvocation?.toolCallId === toolCallId
-  )
+    part.type === 'tool' && 
+    part.id === toolId
+  ) as any
   
-  return toolPart?.toolInvocation?.state !== 'result'
+  return toolPart?.state?.status !== 'completed'
 }
 
 // Get the current streaming status text
@@ -74,17 +80,18 @@ export const getStreamingStatusText = (state: StreamingState): string => {
   return 'Thinking...'
 }
 
+
+
 // Check if message has any content to display
 export const hasDisplayableContent = (message: Message): boolean => {
   return message.parts.some(part => 
     part.type === 'text' || 
-    part.type === 'tool-invocation' ||
-    part.type === 'reasoning'
+    part.type === 'tool'
   )
 }
 
 // Get the last meaningful content part (excluding step-start)
-export const getLastContentPart = (message: Message): MessagePart | null => {
+export const getLastContentPart = (message: Message): AssistantMessagePart | null => {
   for (let i = message.parts.length - 1; i >= 0; i--) {
     const part = message.parts[i]
     if (part.type !== 'step-start') {
@@ -95,8 +102,8 @@ export const getLastContentPart = (message: Message): MessagePart | null => {
 }
 
 // Check if we should show a typing indicator
-export const shouldShowTypingIndicator = (message: Message): boolean => {
-  const state = getStreamingState(message)
+export const shouldShowTypingIndicator = (message: Message, sessionIdle = false): boolean => {
+  const state = getStreamingState(message, sessionIdle)
   
   // Show typing if streaming and either:
   // 1. No content yet

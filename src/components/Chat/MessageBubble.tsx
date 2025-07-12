@@ -1,7 +1,8 @@
 import { useStreamingState } from '../../hooks/useStreamingState'
-import { StreamingIndicator, ToolExecutionStatus } from './StreamingIndicator'
+import { StreamingIndicator } from './StreamingIndicator'
 import { parseDiff, parseFileContent } from '../../utils/streamingHelpers'
-import type { Message, MessagePart } from '../../services/types'
+import type { Message, AssistantMessagePart } from '../../services/types'
+import ReactMarkdown from 'react-markdown'
 import './StreamingIndicator.css'
 
 interface MessageBubbleProps {
@@ -51,7 +52,7 @@ export const MessageBubble = ({ message, className = '' }: MessageBubbleProps) =
 }
 
 interface MessagePartRendererProps {
-  part: MessagePart
+  part: AssistantMessagePart
   message: Message
   isLast: boolean
 }
@@ -61,35 +62,45 @@ const MessagePartRenderer = ({ part, message }: MessagePartRendererProps) => {
     case 'text':
       return (
         <div className="text-part">
-          {part.text}
+          {message.role === 'assistant' ? (
+            <ReactMarkdown>{part.text}</ReactMarkdown>
+          ) : (
+            part.text
+          )}
         </div>
       )
 
-    case 'tool-invocation':
-      if (!part.toolInvocation) return null
-      
-      const toolMetadata = message.metadata.tool[part.toolInvocation.toolCallId]
+    case 'tool': {
+      const toolMetadata = message.metadata.tool[part.id]
       
       return (
-        <div className="tool-invocation-part">
+        <div className="tool-part">
           <div className="tool-header">
-            <span className="tool-name">{part.toolInvocation.toolName}</span>
-            <ToolExecutionStatus 
-              message={message} 
-              toolCallId={part.toolInvocation.toolCallId} 
-            />
+            <span className="tool-name">{part.tool}</span>
+            <span className="tool-status">{part.state.status}</span>
           </div>
           
           {/* Tool arguments */}
-          <div className="tool-args">
-            <pre>{JSON.stringify(part.toolInvocation.args, null, 2)}</pre>
-          </div>
+          {part.state.status === 'running' && part.state.args && (
+            <div className="tool-args">
+              <h4>Arguments:</h4>
+              <pre>{JSON.stringify(part.state.args, null, 2)}</pre>
+            </div>
+          )}
 
           {/* Tool result */}
-          {part.toolInvocation.result && (
+          {part.state.status === 'completed' && part.state.result && (
             <div className="tool-result">
               <h4>Result:</h4>
-              <pre>{part.toolInvocation.result}</pre>
+              <pre>{part.state.result}</pre>
+            </div>
+          )}
+
+          {/* Tool error */}
+          {part.state.status === 'error' && part.state.error && (
+            <div className="tool-error">
+              <h4>Error:</h4>
+              <pre>{part.state.error}</pre>
             </div>
           )}
 
@@ -99,25 +110,23 @@ const MessagePartRenderer = ({ part, message }: MessagePartRendererProps) => {
           )}
         </div>
       )
+    }
 
     case 'step-start':
-      // Don't render step-start parts directly, they're handled by streaming indicator
-      return null
-
-    case 'reasoning':
       return (
-        <div className="reasoning-part">
-          <h4>Reasoning:</h4>
-          <div className="reasoning-content">{part.text}</div>
+        <div className="step-start-part">
+          <div className="step-indicator">
+            {part.text}
+          </div>
         </div>
       )
 
-    case 'file':
+    case 'step-finish':
       return (
-        <div className="file-part">
-          <a href={part.url} download={part.filename}>
-            📎 {part.filename}
-          </a>
+        <div className="step-finish-part">
+          <div className="step-indicator">
+            ✓ {part.text}
+          </div>
         </div>
       )
 
@@ -127,7 +136,14 @@ const MessagePartRenderer = ({ part, message }: MessagePartRendererProps) => {
 }
 
 interface ToolMetadataDisplayProps {
-  metadata: any
+  metadata: {
+    preview?: string
+    diff?: string
+    time?: {
+      start: number
+      end: number
+    }
+  }
 }
 
 const ToolMetadataDisplay = ({ metadata }: ToolMetadataDisplayProps) => {

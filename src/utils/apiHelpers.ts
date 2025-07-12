@@ -1,4 +1,4 @@
-import type { SendMessageRequest, MessagePart } from '../services/types'
+import type { SendMessageRequest, UserMessagePart } from '../services/types'
 import { API_CONFIG, DEFAULT_SETTINGS } from './constants'
 
 // Retry logic with exponential backoff
@@ -53,10 +53,12 @@ export const withTimeout = <T>(
 export const createTextMessageRequest = (
   text: string,
   providerID: string = DEFAULT_SETTINGS.PROVIDER,
-  modelID: string = DEFAULT_SETTINGS.MODEL
+  modelID: string = DEFAULT_SETTINGS.MODEL,
+  mode: string = 'build'
 ): SendMessageRequest => ({
   providerID,
   modelID,
+  mode,
   parts: [{ type: 'text', text }]
 })
 
@@ -65,20 +67,24 @@ export const createFileMessageRequest = (
   mediaType: string,
   url: string,
   providerID: string = DEFAULT_SETTINGS.PROVIDER,
-  modelID: string = DEFAULT_SETTINGS.MODEL
+  modelID: string = DEFAULT_SETTINGS.MODEL,
+  mode: string = 'build'
 ): SendMessageRequest => ({
   providerID,
   modelID,
+  mode,
   parts: [{ type: 'file', filename, mediaType, url }]
 })
 
 export const createMixedMessageRequest = (
-  parts: MessagePart[],
+  parts: UserMessagePart[],
   providerID: string = DEFAULT_SETTINGS.PROVIDER,
-  modelID: string = DEFAULT_SETTINGS.MODEL
+  modelID: string = DEFAULT_SETTINGS.MODEL,
+  mode: string = 'build'
 ): SendMessageRequest => ({
   providerID,
   modelID,
+  mode,
   parts
 })
 

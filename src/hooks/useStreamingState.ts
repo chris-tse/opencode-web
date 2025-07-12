@@ -8,13 +8,16 @@ import {
   isToolExecuting,
   type StreamingState
 } from '../utils/streamingHelpers'
+import { useSessionStore } from '../stores/sessionStore'
 
 // Hook to manage streaming state for a message
 export const useStreamingState = (message: Message | null) => {
+  const { isIdle } = useSessionStore()
+  
   const streamingState = useMemo((): StreamingState | null => {
     if (!message) return null
-    return getStreamingState(message)
-  }, [message])
+    return getStreamingState(message, isIdle)
+  }, [message, isIdle])
 
   const statusText = useMemo(() => {
     if (!streamingState) return ''
@@ -23,8 +26,8 @@ export const useStreamingState = (message: Message | null) => {
 
   const showTypingIndicator = useMemo(() => {
     if (!message) return false
-    return shouldShowTypingIndicator(message)
-  }, [message])
+    return shouldShowTypingIndicator(message, isIdle)
+  }, [message, isIdle])
 
   const hasContent = useMemo(() => {
     if (!message) return false
@@ -70,9 +73,11 @@ export const useStreamingState = (message: Message | null) => {
 
 // Hook for managing multiple messages streaming state
 export const useMessagesStreamingState = (messages: Message[]) => {
+  const { isIdle } = useSessionStore()
+  
   const streamingStates = useMemo(() => {
-    return messages.map(message => getStreamingState(message))
-  }, [messages])
+    return messages.map(message => getStreamingState(message, isIdle))
+  }, [messages, isIdle])
 
   const hasAnyStreaming = useMemo(() => {
     return streamingStates.some(state => state.isStreaming)
@@ -81,8 +86,8 @@ export const useMessagesStreamingState = (messages: Message[]) => {
   const lastMessage = messages[messages.length - 1]
   const lastMessageStreaming = useMemo(() => {
     if (!lastMessage) return false
-    return getStreamingState(lastMessage).isStreaming
-  }, [lastMessage])
+    return getStreamingState(lastMessage, isIdle).isStreaming
+  }, [lastMessage, isIdle])
 
   return {
     streamingStates,

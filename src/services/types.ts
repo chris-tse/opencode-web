@@ -41,25 +41,50 @@ export interface ProvidersResponse {
   default: Record<string, string>
 }
 
-// Message Types
-export interface MessagePart {
-  type: 'text' | 'tool-invocation' | 'reasoning' | 'file' | 'source-url' | 'step-start'
-  text?: string
-  mediaType?: string
-  filename?: string
-  url?: string
-  toolInvocation?: ToolInvocation
-  providerMetadata?: Record<string, unknown>
+// Message part types for assistant messages
+export type AssistantMessagePart = TextPart | ToolPart | StepStartPart | StepFinishPart
+
+export interface StepStartPart {
+  type: 'step-start'
+  text: string
 }
 
-export interface ToolInvocation {
-  state: 'call' | 'partial-call' | 'result'
-  step?: number
-  toolCallId: string
-  toolName: string
-  args: Record<string, unknown>
+export interface StepFinishPart {
+  type: 'step-finish'
+  text: string
+}
+
+export interface ToolPart {
+  type: 'tool'
+  id: string
+  tool: string
+  state: ToolState
+}
+
+export type ToolState = ToolStatePending | ToolStateRunning | ToolStateCompleted | ToolStateError
+
+export interface ToolStatePending {
+  status: 'pending'
+}
+
+export interface ToolStateRunning {
+  status: 'running'
+  args?: Record<string, unknown>
+}
+
+export interface ToolStateCompleted {
+  status: 'completed'
+  args?: Record<string, unknown>
   result?: string
 }
+
+export interface ToolStateError {
+  status: 'error'
+  args?: Record<string, unknown>
+  error?: string
+}
+
+
 
 export interface MessageMetadata {
   time: {
@@ -103,7 +128,7 @@ export interface ToolMetadata {
 export interface Message {
   id: string
   role: 'user' | 'assistant'
-  parts: MessagePart[]
+  parts: AssistantMessagePart[]
   metadata: MessageMetadata
 }
 
@@ -111,7 +136,23 @@ export interface Message {
 export interface SendMessageRequest {
   providerID: string
   modelID: string
-  parts: MessagePart[]
+  mode: string
+  parts: UserMessagePart[]
+}
+
+// User message part types (limited to text and file only)
+export type UserMessagePart = TextPart | FilePart
+
+export interface TextPart {
+  type: 'text'
+  text: string
+}
+
+export interface FilePart {
+  type: 'file'
+  filename: string
+  mediaType: string
+  url: string
 }
 
 // Event Stream Types
@@ -131,7 +172,7 @@ export interface MessageUpdatedProperties {
 }
 
 export interface MessagePartUpdatedProperties {
-  part: MessagePart
+  part: AssistantMessagePart
   sessionID: string
   messageID: string
 }
@@ -159,6 +200,27 @@ export interface AppError extends Error {
   code?: string
   statusCode?: number
   data?: unknown
+}
+
+// Todo Types
+export interface TodoItem {
+  content: string
+  status: 'pending' | 'in_progress' | 'completed' | 'cancelled'
+  id: string
+  priority: 'high' | 'medium' | 'low'
+}
+
+export const isTodoArgs = (args?: Record<string, unknown>): args is { todos: TodoItem[] } => {
+  return args != null && 
+         Array.isArray(args.todos) && 
+         args.todos.every(todo => 
+           typeof todo === 'object' && 
+           todo != null &&
+           typeof todo.content === 'string' &&
+           typeof todo.status === 'string' &&
+           typeof todo.id === 'string' &&
+           typeof todo.priority === 'string'
+         )
 }
 
 // Config Types
