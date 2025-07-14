@@ -18,6 +18,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   isIdle: false,
 
   initializeSession: async () => {
+    console.log('initializeSession')
     const { sessionId, isInitializing } = get()
     
     // Don't create a new session if one already exists or is being created
