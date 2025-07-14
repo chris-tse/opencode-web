@@ -134,6 +134,7 @@ export interface Message {
 
 // Request Types
 export interface SendMessageRequest {
+  messageID: string
   providerID: string
   modelID: string
   mode: string
@@ -144,14 +145,19 @@ export interface SendMessageRequest {
 export type UserMessagePart = TextPart | FilePart
 
 export interface TextPart {
+  id: string
+  sessionID: string
+  messageID: string
   type: 'text'
   text: string
 }
 
 export interface FilePart {
+  id: string
+  sessionID: string
+  messageID: string
   type: 'file'
-  filename: string
-  mediaType: string
+  mime: string
   url: string
 }
 

@@ -55,7 +55,7 @@ function App() {
     try {
       // Get the correct provider for the selected model
       const providerId = getProviderForModel(selectedModel)
-      const message = createTextMessageRequest(userInput, providerId, selectedModel, selectedMode)
+      const message = createTextMessageRequest(userInput, sessionId, providerId, selectedModel, selectedMode)
       
       // Initial status - will be updated by event stream
       addStatusMessage('Waiting for response...')

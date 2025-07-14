@@ -107,18 +107,7 @@ export const getConfig = async (): Promise<Record<string, unknown>> => {
   return apiRequest<Record<string, unknown>>('/config')
 }
 
-// Utility functions for common operations
-export const createTextMessage = (text: string): SendMessageRequest['parts'] => [
-  { type: 'text', text }
-]
-
-export const createFileMessage = (
-  filename: string,
-  mediaType: string,
-  url: string
-): SendMessageRequest['parts'] => [
-  { type: 'file', filename, mediaType, url }
-]
+// Note: Message creation utilities are now in utils/apiHelpers.ts
 
 // Default export with all API functions
 export const api = {
@@ -136,11 +125,7 @@ export const api = {
   // App
   getAppInfo,
   initializeApp,
-  getConfig,
-  
-  // Utilities
-  createTextMessage,
-  createFileMessage
+  getConfig
 }
 
 export default api

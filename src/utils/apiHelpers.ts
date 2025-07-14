@@ -49,32 +49,59 @@ export const withTimeout = <T>(
   ])
 }
 
+// ID generation utility
+const generateId = (): string => {
+  return crypto.randomUUID()
+}
+
 // Message creation helpers
 export const createTextMessageRequest = (
   text: string,
+  sessionID: string,
   providerID: string = DEFAULT_SETTINGS.PROVIDER,
   modelID: string = DEFAULT_SETTINGS.MODEL,
   mode: string = 'build'
-): SendMessageRequest => ({
-  providerID,
-  modelID,
-  mode,
-  parts: [{ type: 'text', text }]
-})
+): SendMessageRequest => {
+  const messageID = generateId()
+  return {
+    messageID,
+    providerID,
+    modelID,
+    mode,
+    parts: [{
+      id: generateId(),
+      sessionID,
+      messageID,
+      type: 'text',
+      text
+    }]
+  }
+}
 
 export const createFileMessageRequest = (
-  filename: string,
-  mediaType: string,
+  mime: string,
   url: string,
+  sessionID: string,
   providerID: string = DEFAULT_SETTINGS.PROVIDER,
   modelID: string = DEFAULT_SETTINGS.MODEL,
   mode: string = 'build'
-): SendMessageRequest => ({
-  providerID,
-  modelID,
-  mode,
-  parts: [{ type: 'file', filename, mediaType, url }]
-})
+): SendMessageRequest => {
+  const messageID = generateId()
+  return {
+    messageID,
+    providerID,
+    modelID,
+    mode,
+    parts: [{
+      id: generateId(),
+      sessionID,
+      messageID,
+      type: 'file',
+      mime,
+      url
+    }]
+  }
+}
 
 export const createMixedMessageRequest = (
   parts: UserMessagePart[],
@@ -82,6 +109,7 @@ export const createMixedMessageRequest = (
   modelID: string = DEFAULT_SETTINGS.MODEL,
   mode: string = 'build'
 ): SendMessageRequest => ({
+  messageID: generateId(),
   providerID,
   modelID,
   mode,
