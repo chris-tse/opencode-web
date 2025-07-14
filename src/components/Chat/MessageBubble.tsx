@@ -1,197 +1,75 @@
-import { useStreamingState } from '../../hooks/useStreamingState'
-import { StreamingIndicator } from './StreamingIndicator'
-import { parseDiff, parseFileContent } from '../../utils/streamingHelpers'
-import type { Message, AssistantMessagePart } from '../../services/types'
+import React, { memo } from 'react'
+import { Avatar, AvatarFallback } from '../ui/avatar'
 import ReactMarkdown from 'react-markdown'
-import './StreamingIndicator.css'
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
+import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import type { ChatMessage } from '../../stores/messageStore'
 
 interface MessageBubbleProps {
-  message: Message
-  className?: string
+  message: ChatMessage
 }
 
-export const MessageBubble = ({ message, className = '' }: MessageBubbleProps) => {
-  const { isStreaming } = useStreamingState(message)
+export const MessageBubble = memo(({ message }: MessageBubbleProps) => (
+  <div className="flex items-start gap-3">
+    <Avatar className="w-8 h-8">
+      <AvatarFallback>
+        {message.type === 'user' ? 'U' : 
+         message.type === 'assistant' ? 'A' : 
+         message.type === 'event' ? '⚡' : '!'}
+      </AvatarFallback>
+    </Avatar>
+    <div className="flex-1">
+       <div className={`rounded-lg p-3 ${
+         message.type === 'user' ? 'bg-blue-50' : 
+         message.type === 'event' ? 'bg-yellow-50 text-yellow-800' :
+         message.type === 'error' ? 'bg-red-50 text-red-700' : 
+         'bg-gray-50'
+       } ${message.type === 'assistant' ? 'prose prose-sm max-w-none' : ''}`}>
+         {message.type === 'assistant' ? (
+           <ReactMarkdown
+             components={{
+               code({ inline, className, children, ...props }: {
+                 inline?: boolean
+                 className?: string
+                 children?: React.ReactNode
+               }) {
+                 const match = /language-(\w+)/.exec(className || '')
+                 return !inline && match ? (
+                   <SyntaxHighlighter
+                     style={oneDark}
+                     language={match[1]}
+                     PreTag="div"
+                     {...props}
+                   >
+                     {String(children).replace(/\n$/, '')}
+                   </SyntaxHighlighter>
+                 ) : (
+                   <code className={className} {...props}>
+                     {children}
+                   </code>
+                 )
+               },
+             }}
+           >
+             {message.content}
+           </ReactMarkdown>
+         ) : (
+           <div className="whitespace-pre-wrap">{message.content}</div>
+         )}
+         {message.type === 'event' && message.content.includes('...') && (
+           <div className="mt-2">
+             <div className="animate-pulse flex space-x-1">
+               <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
+               <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
+               <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
+             </div>
+           </div>
+         )}
+       </div>
+     </div>
+   </div>
+))
 
-  return (
-    <div className={`message-bubble ${message.role} ${className}`}>
-      {/* Message content */}
-      <div className="message-content">
-        {message.parts.map((part, index) => (
-          <MessagePartRenderer 
-            key={index} 
-            part={part} 
-            message={message}
-            isLast={index === message.parts.length - 1}
-          />
-        ))}
-      </div>
-
-      {/* Streaming indicator */}
-      {isStreaming && (
-        <StreamingIndicator message={message} />
-      )}
-
-      {/* Message metadata */}
-      {!isStreaming && (
-        <div className="message-metadata">
-          <span className="timestamp">
-            {new Date(message.metadata.time.created).toLocaleTimeString()}
-          </span>
-          {message.metadata.time.completed && (
-            <span className="completion-time">
-              Completed in {
-                Math.round((message.metadata.time.completed - message.metadata.time.created) / 1000)
-              }s
-            </span>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
-interface MessagePartRendererProps {
-  part: AssistantMessagePart
-  message: Message
-  isLast: boolean
-}
-
-const MessagePartRenderer = ({ part, message }: MessagePartRendererProps) => {
-  switch (part.type) {
-    case 'text':
-      return (
-        <div className="text-part">
-          {message.role === 'assistant' ? (
-            <ReactMarkdown>{part.text}</ReactMarkdown>
-          ) : (
-            part.text
-          )}
-        </div>
-      )
-
-    case 'tool': {
-      const toolMetadata = message.metadata.tool[part.id]
-      
-      return (
-        <div className="tool-part">
-          <div className="tool-header">
-            <span className="tool-name">{part.tool}</span>
-            <span className="tool-status">{part.state.status}</span>
-          </div>
-          
-          {/* Tool arguments */}
-          {part.state.status === 'running' && part.state.args && (
-            <div className="tool-args">
-              <h4>Arguments:</h4>
-              <pre>{JSON.stringify(part.state.args, null, 2)}</pre>
-            </div>
-          )}
-
-          {/* Tool result */}
-          {part.state.status === 'completed' && part.state.result && (
-            <div className="tool-result">
-              <h4>Result:</h4>
-              <pre>{part.state.result}</pre>
-            </div>
-          )}
-
-          {/* Tool error */}
-          {part.state.status === 'error' && part.state.error && (
-            <div className="tool-error">
-              <h4>Error:</h4>
-              <pre>{part.state.error}</pre>
-            </div>
-          )}
-
-          {/* Rich tool metadata display */}
-          {toolMetadata && (
-            <ToolMetadataDisplay metadata={toolMetadata} />
-          )}
-        </div>
-      )
-    }
-
-    case 'step-start':
-      return (
-        <div className="step-start-part">
-          <div className="step-indicator">
-            {part.text}
-          </div>
-        </div>
-      )
-
-    case 'step-finish':
-      return (
-        <div className="step-finish-part">
-          <div className="step-indicator">
-            ✓ {part.text}
-          </div>
-        </div>
-      )
-
-    default:
-      return null
-  }
-}
-
-interface ToolMetadataDisplayProps {
-  metadata: {
-    preview?: string
-    diff?: string
-    time?: {
-      start: number
-      end: number
-    }
-  }
-}
-
-const ToolMetadataDisplay = ({ metadata }: ToolMetadataDisplayProps) => {
-  return (
-    <div className="tool-metadata">
-      {/* File preview */}
-      {metadata.preview && (
-        <div className="file-preview">
-          <h5>File Preview:</h5>
-          <pre className="file-content">
-            {parseFileContent(metadata.preview).map((line, i) => (
-              <div key={i} className="file-line">
-                <span className="line-number">{line.lineNumber.toString().padStart(5, '0')}</span>
-                <span className="line-content">{line.content}</span>
-              </div>
-            ))}
-          </pre>
-        </div>
-      )}
-
-      {/* Diff display */}
-      {metadata.diff && (
-        <div className="diff-display">
-          <h5>Changes:</h5>
-          <div className="diff-content">
-            {parseDiff(metadata.diff).map((line, i) => (
-              <div key={i} className={`diff-line ${line.type}`}>
-                {line.lineNumber && (
-                  <span className="line-numbers">
-                    <span className="old-line">{line.lineNumber.old || ''}</span>
-                    <span className="new-line">{line.lineNumber.new || ''}</span>
-                  </span>
-                )}
-                <span className="line-content">{line.content}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Execution time */}
-      {metadata.time && (
-        <div className="execution-time">
-          Executed in {metadata.time.end - metadata.time.start}ms
-        </div>
-      )}
-    </div>
-  )
-}
+MessageBubble.displayName = "MessageBubble"
 
 export default MessageBubble

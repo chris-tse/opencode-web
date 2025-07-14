@@ -1,9 +1,8 @@
-import { useState, useEffect, useCallback, useRef, type FormEvent, useMemo } from 'react'
+import React, { useState, useEffect, useCallback, useRef, type FormEvent, useMemo } from 'react'
 import { sendMessage } from './services/api'
 import { createTextMessageRequest } from './utils/apiHelpers'
 import { createEventStream } from './services/eventStream'
 import type { Message, AssistantMessagePart, MessageMetadata, MessageUpdatedProperties, MessagePartUpdatedProperties, SessionErrorProperties } from './services/types'
-// import { EventStreamDebug } from './components/Debug/EventStreamDebug'
 import { getOverallToolStatus, getContextualToolStatus, hasActiveToolExecution, getToolProgress } from './utils/toolStatusHelpers'
 import { MODE_LABELS, DEFAULT_SETTINGS } from './utils/constants'
 import { useSessionStore } from './stores/sessionStore'
@@ -11,20 +10,18 @@ import { useModelStore } from './stores/modelStore'
 import { useMessageStore } from './stores/messageStore'
 import { Button } from './components/ui/button'
 import { Textarea } from './components/ui/textarea'
-import { ScrollArea } from './components/ui/scroll-area'
-import { Avatar, AvatarFallback } from './components/ui/avatar'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select'
 import { ModelSelect } from './components/ModelSelect'
-import ReactMarkdown from 'react-markdown'
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import { ChatContainer } from './components/Chat/ChatContainer'
+
+
 
 function App() {
   const [isLoading, setIsLoading] = useState(false)
   const eventStream = useMemo(() => createEventStream(), [])
   const [hasReceivedFirstEvent, setHasReceivedFirstEvent] = useState(false)
   const [selectedMode, setSelectedMode] = useState<string>(DEFAULT_SETTINGS.MODE)
-  const scrollAreaRef = useRef<HTMLDivElement>(null)
+
   const [currentMessageMetadata, setCurrentMessageMetadata] = useState<MessageMetadata | undefined>(undefined)
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   
@@ -40,15 +37,7 @@ function App() {
     setLastStatusMessage 
   } = useMessageStore()
 
-  // Auto-scroll to bottom when messages change
-  useEffect(() => {
-    if (scrollAreaRef.current) {
-      const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]')
-      if (scrollContainer) {
-        scrollContainer.scrollTop = scrollContainer.scrollHeight
-      }
-    }
-  }, [messages])
+
 
   // Update status based on message content
   const updateStatusFromMessage = useCallback((message: Message) => {
@@ -159,7 +148,7 @@ function App() {
     }
   }, [sessionError, addErrorMessage])
 
-  async function handleSubmit(e: FormEvent) {
+  const handleSubmit = useCallback(async (e: FormEvent) => {
     e.preventDefault()
     const userInput = textareaRef.current?.value.trim() ?? '';
     if (!userInput || !sessionId || isLoading || isInitializing) return
@@ -206,7 +195,15 @@ function App() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [sessionId, isLoading, isInitializing, hasReceivedFirstEvent, selectedModel, selectedMode, getProviderForModel, addUserMessage, addStatusMessage, setLastStatusMessage, setIdle, addErrorMessage])
+
+  // Memoized keyboard event handler to prevent unnecessary re-renders
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit(e as unknown as FormEvent);
+    }
+  }, [handleSubmit])
 
   return (
     <div className="flex flex-col h-screen max-w-4xl mx-auto p-4">
@@ -214,70 +211,7 @@ function App() {
         <h1 className="text-2xl font-bold">OpenCode UI</h1>
       </div>
       
-      <ScrollArea ref={scrollAreaRef} className="h-[calc(100vh-280px)] mb-4 border rounded-lg p-4">
-        <div className="space-y-4">
-          {messages.map((message) => {
-            return (
-              <div key={message.id} className="flex items-start gap-3">
-                <Avatar className="w-8 h-8">
-                  <AvatarFallback>
-                    {message.type === 'user' ? 'U' : 
-                     message.type === 'assistant' ? 'A' : 
-                     message.type === 'event' ? '⚡' : '!'}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1">
-                   <div className={`rounded-lg p-3 ${
-                     message.type === 'user' ? 'bg-blue-50' : 
-                     message.type === 'event' ? 'bg-yellow-50 text-yellow-800' :
-                     message.type === 'error' ? 'bg-red-50 text-red-700' : 
-                     'bg-gray-50'
-                   } ${message.type === 'assistant' ? 'prose prose-sm max-w-none' : ''}`}>                     {message.type === 'assistant' ? (
-                        <ReactMarkdown
-                          components={{
-                            code({ inline, className, children, ...props }: {
-                              inline?: boolean
-                              className?: string
-                              children?: React.ReactNode
-                            }) {
-                              const match = /language-(\w+)/.exec(className || '')
-                              return !inline && match ? (                               <SyntaxHighlighter
-                                 style={oneDark}
-                                 language={match[1]}
-                                 PreTag="div"
-                                 {...props}
-                               >
-                                 {String(children).replace(/\n$/, '')}
-                               </SyntaxHighlighter>
-                             ) : (
-                               <code className={className} {...props}>
-                                 {children}
-                               </code>
-                             )
-                           },
-                         }}
-                       >
-                         {message.content}
-                       </ReactMarkdown>
-                     ) : (
-                       <div className="whitespace-pre-wrap">{message.content}</div>
-                     )}                    {message.type === 'event' && message.content.includes('...') && (
-                      <div className="mt-2">
-                        <div className="animate-pulse flex space-x-1">
-                          <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
-                          <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
-                          <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-
-        </div>
-      </ScrollArea>
+      <ChatContainer messages={messages} isLoading={isLoading} />
 
       <div className="space-y-2">
         <div className="flex gap-4 items-center">
@@ -311,12 +245,7 @@ function App() {
             placeholder="Type your message..."
             disabled={isLoading || !sessionId || isInitializing}
             className="flex-1 min-h-[60px] resize-none"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSubmit(e);
-              }
-            }}
+            onKeyDown={handleKeyDown}
           />
           <Button 
             type="submit" 
@@ -327,9 +256,6 @@ function App() {
           </Button>
         </form>
       </div>
-
-      {/* Debug component - only shows in development */}
-      {/* <EventStreamDebug eventStream={eventStream} /> */}
     </div>
   )
 }
