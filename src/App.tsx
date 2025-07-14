@@ -1,20 +1,18 @@
-import React, { useState, useEffect, useCallback, useRef, type FormEvent, useMemo } from 'react'
+import {memo, useState, useEffect, useCallback, useMemo } from 'react'
 import { sendMessage } from './services/api'
 import { createTextMessageRequest } from './utils/apiHelpers'
 import { createEventStream } from './services/eventStream'
 import type { Message, AssistantMessagePart, MessageMetadata, MessageUpdatedProperties, MessagePartUpdatedProperties, SessionErrorProperties } from './services/types'
 import { getOverallToolStatus, getContextualToolStatus, hasActiveToolExecution, getToolProgress } from './utils/toolStatusHelpers'
-import { MODE_LABELS, DEFAULT_SETTINGS } from './utils/constants'
+import { DEFAULT_SETTINGS } from './utils/constants'
 import { useSessionStore } from './stores/sessionStore'
 import { useModelStore } from './stores/modelStore'
 import { useMessageStore } from './stores/messageStore'
-import { Button } from './components/ui/button'
-import { Textarea } from './components/ui/textarea'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select'
-import { ModelSelect } from './components/ModelSelect'
 import { ChatContainer } from './components/Chat/ChatContainer'
+import { MessageInput } from './components/Chat/MessageInput'
+import { SettingsPanel } from './components/Settings/SettingsPanel'
 
-
+const MemoizedSettingsPanel = memo(SettingsPanel)
 
 function App() {
   const [isLoading, setIsLoading] = useState(false)
@@ -23,7 +21,6 @@ function App() {
   const [selectedMode, setSelectedMode] = useState<string>(DEFAULT_SETTINGS.MODE)
 
   const [currentMessageMetadata, setCurrentMessageMetadata] = useState<MessageMetadata | undefined>(undefined)
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   
   const { sessionId, isInitializing, error: sessionError, initializeSession, setIdle } = useSessionStore()
   const { selectedModel, getProviderForModel } = useModelStore()
@@ -148,14 +145,8 @@ function App() {
     }
   }, [sessionError, addErrorMessage])
 
-  const handleSubmit = useCallback(async (e: FormEvent) => {
-    e.preventDefault()
-    const userInput = textareaRef.current?.value.trim() ?? '';
+  const handleMessageSubmit = useCallback(async (userInput: string) => {
     if (!userInput || !sessionId || isLoading || isInitializing) return
-    
-    if (textareaRef.current) {
-      textareaRef.current.value = '';
-    }
     
     setIsLoading(true)
     setHasReceivedFirstEvent(false)
@@ -197,13 +188,7 @@ function App() {
     }
   }, [sessionId, isLoading, isInitializing, hasReceivedFirstEvent, selectedModel, selectedMode, getProviderForModel, addUserMessage, addStatusMessage, setLastStatusMessage, setIdle, addErrorMessage])
 
-  // Memoized keyboard event handler to prevent unnecessary re-renders
-  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit(e as unknown as FormEvent);
-    }
-  }, [handleSubmit])
+
 
   return (
     <div className="flex flex-col h-screen max-w-4xl mx-auto p-4">
@@ -214,47 +199,17 @@ function App() {
       <ChatContainer messages={messages} isLoading={isLoading} />
 
       <div className="space-y-2">
-        <div className="flex gap-4 items-center">
-          <div className="flex gap-2 items-center">
-            <label htmlFor="mode-select" className="text-sm font-medium">Mode:</label>
-            <Select value={selectedMode} onValueChange={setSelectedMode}>
-              <SelectTrigger className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(MODE_LABELS).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          
-          <div className="flex gap-2 items-center">
-            <label htmlFor="model-select" className="text-sm font-medium">Model:</label>
-            <ModelSelect 
-              disabled={isLoading || isInitializing}
-            />
-          </div>
-        </div>
+        <MemoizedSettingsPanel 
+          selectedMode={selectedMode}
+          onModeChange={setSelectedMode}
+        />
         
-        <form onSubmit={handleSubmit} className="flex gap-2">
-          <Textarea
-            ref={textareaRef}
-            placeholder="Type your message..."
-            disabled={isLoading || !sessionId || isInitializing}
-            className="flex-1 min-h-[60px] resize-none"
-            onKeyDown={handleKeyDown}
-          />
-          <Button 
-            type="submit" 
-            disabled={isLoading || !sessionId || isInitializing}
-            className="self-end"
-          >
-            {isLoading ? 'Sending...' : isInitializing ? 'Initializing...' : 'Send'}
-          </Button>
-        </form>
+        <MessageInput
+          onSubmit={handleMessageSubmit}
+          disabled={isLoading || !sessionId || isInitializing}
+          isLoading={isLoading}
+          isInitializing={isInitializing}
+        />
       </div>
     </div>
   )

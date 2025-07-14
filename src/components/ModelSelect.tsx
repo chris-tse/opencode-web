@@ -2,11 +2,7 @@ import { useEffect } from 'react'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from './ui/select'
 import { useModelStore } from '../stores/modelStore'
 
-interface ModelSelectProps {
-  disabled?: boolean
-}
-
-export function ModelSelect({ disabled }: ModelSelectProps) {
+export function ModelSelect() {
   const {
     selectedModel,
     providers,
@@ -53,7 +49,7 @@ export function ModelSelect({ disabled }: ModelSelectProps) {
   }
 
   return (
-    <Select value={selectedModel} onValueChange={setSelectedModel} disabled={disabled}>
+    <Select value={selectedModel} onValueChange={setSelectedModel}>
       <SelectTrigger className="w-64">
         <SelectValue placeholder="Select a model">
           {selectedModel ? getSelectedModelName(selectedModel) : 'Select a model'}
