@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { logger } from '../lib/logger'
 
 export interface ChatMessage {
   id: string
@@ -58,11 +59,19 @@ export const useMessageStore = create<MessageState>((set, get) => ({
   
   addTextMessage: (text: string, messageId: string) => {
     set((state) => {
+      // Debug: Log message details to help identify echo issue
+      logger.debug('addTextMessage called:', { 
+        messageId, 
+        textPreview: text.substring(0, 50) + (text.length > 50 ? '...' : ''),
+        lastMessageId: state.messages[state.messages.length - 1]?.id,
+        lastMessageType: state.messages[state.messages.length - 1]?.type
+      })
+      
       // Check if the last message is an assistant message with the same messageId
       const lastMessage = state.messages[state.messages.length - 1]
       const canUpdateLastMessage = lastMessage && 
         lastMessage.type === 'assistant' && 
-        lastMessage.id === `text-${messageId}`
+        lastMessage.id === messageId
       
       if (canUpdateLastMessage) {
         // Update the last message by replacing content
@@ -76,7 +85,7 @@ export const useMessageStore = create<MessageState>((set, get) => ({
       } else {
         // Create new message
         const message: ChatMessage = {
-          id: `text-${messageId}`,
+          id: messageId,
           type: 'assistant',
           content: text,
           timestamp: Date.now()

@@ -1,4 +1,5 @@
 import type { StreamEvent } from './types'
+import { logger } from '../lib/logger'
 
 // Event listener type
 type EventListener<T = unknown> = (data: T) => void
@@ -40,15 +41,16 @@ export class EventStreamService {
     this.eventSource.onmessage = (event) => {
       try {
         const data: StreamEvent = JSON.parse(event.data)
-        // console.log('📨 Received event:', data.type, data.properties)
+        // Debug: Log all events to help identify the echo issue
+        logger.debug('📨 Received event:', data.type, data.properties)
         this.handleEvent(data)
       } catch (error) {
-        console.error('Failed to parse event data:', error)
+        logger.error('Failed to parse event data:', error)
       }
     }
 
     this.eventSource.onerror = (error) => {
-      console.error('EventSource error:', error)
+      logger.error('EventSource error:', error)
       this.handleReconnect()
     }
   }
@@ -93,7 +95,7 @@ export class EventStreamService {
         try {
           callback(event.properties)
         } catch (error) {
-          console.error(`Error in event callback for ${event.type}:`, error)
+          logger.error(`Error in event callback for ${event.type}:`, error)
         }
       })
     }
@@ -102,14 +104,14 @@ export class EventStreamService {
   // Handle reconnection logic
   private handleReconnect(): void {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error('Max reconnection attempts reached')
+      logger.error('Max reconnection attempts reached')
       return
     }
 
     this.reconnectAttempts++
     const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1)
 
-    console.log(`Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts})`)
+    logger.info(`Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts})`)
     
     setTimeout(() => {
       this.connect()

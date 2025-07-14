@@ -4,6 +4,7 @@ import type { Message, AssistantMessagePart, MessageMetadata, MessageUpdatedProp
 import { getOverallToolStatus, getContextualToolStatus, hasActiveToolExecution, getToolProgress } from '../utils/toolStatusHelpers'
 import { useSessionStore } from '../stores/sessionStore'
 import { useMessageStore } from '../stores/messageStore'
+import { logger } from '../lib/logger'
 
 export function useEventStream() {
   const [hasReceivedFirstEvent, setHasReceivedFirstEvent] = useState(false)
@@ -59,6 +60,8 @@ export function useEventStream() {
       }
     } else if (part.type === 'text') {
       if (part.text && part.text.trim()) {
+        // Debug: Log text parts to help identify the echo issue
+        logger.debug('Received text part:', { messageId, text: part.text.substring(0, 100) + (part.text.length > 100 ? '...' : '') })
         addTextMessage(part.text, messageId)
       }
     } else if (part.type === 'step-start') {
@@ -81,7 +84,7 @@ export function useEventStream() {
     })
     
     eventStream.subscribe('session.error', (data: SessionErrorProperties) => {
-      console.error('Session error:', data)
+      logger.error('Session error:', data)
       addErrorMessage(data.error.data.message)
     })
 

@@ -4,6 +4,7 @@ import { createTextMessageRequest } from '../utils/apiHelpers'
 import { useSessionStore } from '../stores/sessionStore'
 import { useModelStore } from '../stores/modelStore'
 import { useMessageStore } from '../stores/messageStore'
+import { logger } from '../lib/logger'
 
 export function useMessageHandling() {
   const { sessionId, isInitializing, setIdle } = useSessionStore()
@@ -39,7 +40,7 @@ export function useMessageHandling() {
       const message = createTextMessageRequest(userInput, sessionId, providerId, selectedModel, selectedMode)
       
       const response = await sendMessage(sessionId, message)
-      // console.log('Message response:', response)
+      // logger.debug('Message response:', response)
       
       // If we haven't received any events yet, handle the response directly
       if (!hasReceivedFirstEvent) {
@@ -54,7 +55,7 @@ export function useMessageHandling() {
       // No fallback needed - event stream handles all text parts
       
     } catch (error) {
-      console.error('Failed to send message:', error)
+      logger.error('Failed to send message:', error)
       addErrorMessage(`Failed to send message - ${error}`)
     } finally {
       setIsLoading(false)

@@ -8,8 +8,8 @@
 
 ## Build/Test Commands
 - `bun dev` - Start development server, do not run
-- `bun build` - Build for production (runs TypeScript check + Vite build)
-- `bun lint` - Run ESLint
+- `bun run build` - Build for production (runs TypeScript check + Vite build)
+- `bun run lint` - Run ESLint
 - No test framework configured yet
 
 ## MVP Scope (from PRD.md)
