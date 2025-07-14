@@ -1,13 +1,11 @@
-import {memo, useState, useEffect, useCallback, useMemo } from 'react'
+import {memo, useState, useEffect, useCallback } from 'react'
 import { sendMessage } from './services/api'
 import { createTextMessageRequest } from './utils/apiHelpers'
-import { createEventStream } from './services/eventStream'
-import type { Message, AssistantMessagePart, MessageMetadata, MessageUpdatedProperties, MessagePartUpdatedProperties, SessionErrorProperties } from './services/types'
-import { getOverallToolStatus, getContextualToolStatus, hasActiveToolExecution, getToolProgress } from './utils/toolStatusHelpers'
 import { DEFAULT_SETTINGS } from './utils/constants'
 import { useSessionStore } from './stores/sessionStore'
 import { useModelStore } from './stores/modelStore'
 import { useMessageStore } from './stores/messageStore'
+import { useEventStream } from './hooks/useEventStream'
 import { ChatContainer } from './components/Chat/ChatContainer'
 import { MessageInput } from './components/Chat/MessageInput'
 import { SettingsPanel } from './components/Settings/SettingsPanel'
@@ -15,128 +13,25 @@ import { SettingsPanel } from './components/Settings/SettingsPanel'
 const MemoizedSettingsPanel = memo(SettingsPanel)
 
 function App() {
-  const [isLoading, setIsLoading] = useState(false)
-  const eventStream = useMemo(() => createEventStream(), [])
-  const [hasReceivedFirstEvent, setHasReceivedFirstEvent] = useState(false)
   const [selectedMode, setSelectedMode] = useState<string>(DEFAULT_SETTINGS.MODE)
-
-  const [currentMessageMetadata, setCurrentMessageMetadata] = useState<MessageMetadata | undefined>(undefined)
   
   const { sessionId, isInitializing, error: sessionError, initializeSession, setIdle } = useSessionStore()
   const { selectedModel, getProviderForModel } = useModelStore()
   const { 
-    messages, 
     addStatusMessage, 
-    addTextMessage, 
     addUserMessage, 
     addErrorMessage, 
-    removeLastEventMessage, 
     setLastStatusMessage 
   } = useMessageStore()
+  
+  const { hasReceivedFirstEvent, setHasReceivedFirstEvent, isLoading, setIsLoading } = useEventStream()
 
 
 
-  // Update status based on message content
-  const updateStatusFromMessage = useCallback((message: Message) => {
-    if (!hasReceivedFirstEvent) {
-      setHasReceivedFirstEvent(true)
-    }
-    
-    // Store the current message metadata for use in part updates
-    setCurrentMessageMetadata(message.metadata)
-    
-    // Check if message is complete
-    if (message.metadata?.time?.completed) {
-      setIsLoading(false)
-      return
-    }
-
-    // Get tool status using helper functions
-    if (hasActiveToolExecution(message)) {
-      const status = getOverallToolStatus(message.parts || [])
-      addStatusMessage(status)
-    } else {
-      const progress = getToolProgress(message)
-      if (progress.total > 0) {
-        addStatusMessage(`✓ Completed ${progress.total} tool${progress.total > 1 ? 's' : ''} - Generating response...`)
-      } else {
-        addStatusMessage('Generating response...')
-      }
-    }
-  }, [hasReceivedFirstEvent, addStatusMessage])
-
-  // Update status based on individual message parts
-  const updateStatusFromPart = useCallback((part: AssistantMessagePart, messageId: string, messageMetadata?: MessageMetadata) => {
-    if (!hasReceivedFirstEvent) {
-      setHasReceivedFirstEvent(true)
-    }
-
-    if (part.type === 'tool' && part.state) {
-      const status = getContextualToolStatus(part, messageMetadata)
-      addStatusMessage(status)
-      
-      // If tool completed, add a generating response event
-      if (part.state.status === 'completed') {
-        setTimeout(() => {
-          if (isLoading) {
-            addStatusMessage('Generating response...')
-          }
-        }, 800)
-      }
-    } else if (part.type === 'text') {
-      // Add each text part as a separate message bubble
-      if (part.text && part.text.trim()) {
-        addTextMessage(part.text, messageId)
-      }
-    } else if (part.type === 'step-start') {
-      if (hasReceivedFirstEvent) {
-        addStatusMessage('Processing next step...')
-      }
-    }
-  }, [hasReceivedFirstEvent, isLoading, addStatusMessage, addTextMessage])
-
-
-  // Initialize session and connect to event stream on app initialization
+  // Initialize session on app initialization
   useEffect(() => {
     initializeSession()
-    
-    // Connect to event stream
-    eventStream.connect()
-    
-    // Subscribe to events
-    eventStream.subscribe('message.updated', (data: MessageUpdatedProperties) => {
-      // console.log('Message updated:', data)
-      updateStatusFromMessage(data.info)
-    })
-    
-    eventStream.subscribe('message.part.updated', (data: MessagePartUpdatedProperties) => {
-      // console.log('Message part updated:', data)
-      updateStatusFromPart(data.part, data.messageID, currentMessageMetadata)
-    })
-    
-    eventStream.subscribe('session.error', (data: SessionErrorProperties) => {
-      console.error('Session error:', data)
-      addErrorMessage(data.error.data.message)
-    })
-
-    eventStream.subscribe('session.idle', (data: { sessionID: string }) => {
-      if (data.sessionID === sessionId) {
-        setIdle(true)
-        setIsLoading(false)
-        
-        // Remove any lingering processing status messages
-        removeLastEventMessage()
-        
-        // Reset last status message to prevent duplicates
-        setLastStatusMessage('')
-      }
-    })
-    
-    // Cleanup on unmount
-    return () => {
-      eventStream.disconnect()
-    }
-  }, [eventStream, initializeSession, updateStatusFromMessage, updateStatusFromPart, currentMessageMetadata, sessionId, setIdle, addErrorMessage, removeLastEventMessage, setLastStatusMessage])
+  }, [initializeSession])
 
   // Display session error if any
   useEffect(() => {
@@ -196,7 +91,7 @@ function App() {
         <h1 className="text-2xl font-bold">OpenCode UI</h1>
       </div>
       
-      <ChatContainer messages={messages} isLoading={isLoading} />
+      <ChatContainer isLoading={isLoading} />
 
       <div className="space-y-2">
         <MemoizedSettingsPanel 

@@ -7,7 +7,7 @@ interface SettingsPanelProps {
   onModeChange: (mode: string) => void
 }
 
-export const SettingsPanel = ({ selectedMode, onModeChange, disabled }: SettingsPanelProps) => {
+export const SettingsPanel = ({ selectedMode, onModeChange }: SettingsPanelProps) => {
   return (
     <div className="flex gap-4 items-center">
       <div className="flex gap-2 items-center">
