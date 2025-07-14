@@ -10,16 +10,16 @@ interface MessageBubbleProps {
 }
 
 export const MessageBubble = memo(({ message }: MessageBubbleProps) => (
-  <div className="flex items-start gap-3">
-    <Avatar className="w-8 h-8">
+  <div className="flex items-start gap-3 max-w-full">
+    <Avatar className="w-8 h-8 flex-shrink-0">
       <AvatarFallback>
         {message.type === 'user' ? 'U' : 
          message.type === 'assistant' ? 'A' : 
          message.type === 'event' ? '⚡' : '!'}
       </AvatarFallback>
     </Avatar>
-    <div className="flex-1">
-       <div className={`rounded-lg p-3 ${
+    <div className="flex-1 min-w-0">
+       <div className={`rounded-lg p-3 max-w-full ${
          message.type === 'user' ? 'bg-blue-50' : 
          message.type === 'event' ? 'bg-yellow-50 text-yellow-800' :
          message.type === 'error' ? 'bg-red-50 text-red-700' : 
