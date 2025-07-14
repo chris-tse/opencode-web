@@ -32,15 +32,11 @@ export function useMessageHandling() {
     
     // Add user message to messages
     addUserMessage(userInput)
-    addStatusMessage('Sending message...')
     
     try {
       // Get the correct provider for the selected model
       const providerId = getProviderForModel(selectedModel)
       const message = createTextMessageRequest(userInput, sessionId, providerId, selectedModel, selectedMode)
-      
-      // Initial status - will be updated by event stream
-      addStatusMessage('Waiting for response...')
       
       const response = await sendMessage(sessionId, message)
       // console.log('Message response:', response)

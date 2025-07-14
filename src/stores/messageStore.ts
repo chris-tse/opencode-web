@@ -57,15 +57,33 @@ export const useMessageStore = create<MessageState>((set, get) => ({
   },
   
   addTextMessage: (text: string, messageId: string) => {
-    const message: ChatMessage = {
-      id: `text-${messageId}-${Date.now()}-${Math.random()}`,
-      type: 'assistant',
-      content: text,
-      timestamp: Date.now()
-    }
-    set((state) => ({
-      messages: [...state.messages, message]
-    }))
+    set((state) => {
+      // Check if the last message is an assistant message with the same messageId
+      const lastMessage = state.messages[state.messages.length - 1]
+      const canUpdateLastMessage = lastMessage && 
+        lastMessage.type === 'assistant' && 
+        lastMessage.id === `text-${messageId}`
+      
+      if (canUpdateLastMessage) {
+        // Update the last message by replacing content
+        const updatedMessages = [...state.messages]
+        updatedMessages[updatedMessages.length - 1] = {
+          ...lastMessage,
+          content: text,
+          timestamp: Date.now()
+        }
+        return { messages: updatedMessages }
+      } else {
+        // Create new message
+        const message: ChatMessage = {
+          id: `text-${messageId}`,
+          type: 'assistant',
+          content: text,
+          timestamp: Date.now()
+        }
+        return { messages: [...state.messages, message] }
+      }
+    })
   },
   
   addUserMessage: (content: string) => {

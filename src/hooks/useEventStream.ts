@@ -38,10 +38,9 @@ export function useEventStream() {
     } else {
       const progress = getToolProgress(message)
       if (progress.total > 0) {
-        addStatusMessage(`✓ Completed ${progress.total} tool${progress.total > 1 ? 's' : ''} - Generating response...`)
-      } else {
-        addStatusMessage('Generating response...')
+        addStatusMessage(`✓ Completed ${progress.total} tool${progress.total > 1 ? 's' : ''}`)
       }
+      // Don't show "Generating response..." - text parts will indicate response generation
     }
   }, [hasReceivedFirstEvent, addStatusMessage])
 
@@ -55,20 +54,18 @@ export function useEventStream() {
       addStatusMessage(status)
       
       if (part.state.status === 'completed') {
-        setTimeout(() => {
-          if (isLoading) {
-            addStatusMessage('Generating response...')
-          }
-        }, 800)
+        // Don't add "Generating response..." status as text parts will arrive immediately
+        // and the presence of text indicates response generation
       }
     } else if (part.type === 'text') {
       if (part.text && part.text.trim()) {
         addTextMessage(part.text, messageId)
       }
     } else if (part.type === 'step-start') {
-      if (hasReceivedFirstEvent) {
-        addStatusMessage('Processing next step...')
-      }
+      // TODO: Handle step-start differently - commented out for now
+      // if (hasReceivedFirstEvent) {
+      //   addStatusMessage('Processing next step...')
+      // }
     }
   }, [hasReceivedFirstEvent, isLoading, addStatusMessage, addTextMessage])
 
